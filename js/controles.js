@@ -52,7 +52,7 @@
     }
     var a = TECLAS[e.key];
     if (a) M.accion(a);
-    else if (/^[1-9]$/.test(e.key)) M.accion('numero', Number(e.key));
+    else if (/^[0-9]$/.test(e.key)) M.accion('numero', Number(e.key));
     else M.accion('otra', nombreTecla(e.key));
   });
 

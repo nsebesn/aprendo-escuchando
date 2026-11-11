@@ -10,7 +10,7 @@ var path = require('path');
 var raiz = path.join(__dirname, '..', 'js');
 
 global.window = global;
-['numeros.js', 'texto.js', 'registro.js', 'contenido/recorrido.js',
+['numeros.js', 'texto.js', 'registro.js', 'barras.js', 'resolver.js', 'contenido/recorrido.js',
   'contenido/mat-1.js', 'contenido/mat-2.js', 'contenido/mat-3.js', 'contenido/mat-4.js', 'contenido/mat-5.js',
   'contenido/esp-1.js', 'contenido/esp-2.js', 'contenido/esp-3.js'
 ].forEach(function (f) { require(path.join(raiz, f)); });
@@ -143,6 +143,105 @@ igual(esp, 14, 'lecciones de español');
   igual(acciones.join(','), 'repetir,siguiente,anterior,abajo,arriba,elegir,menu', 'acciones del recorrido ' + modo);
 });
 
+// ---------- 6. Barras de fracciones ----------
+var B = AE.Barras;
+igual(B.deTexto('{1/2} + {1/4} = {3/4}').barras.length, 3, 'barras: tres fracciones en un texto');
+igual(B.deTexto('Son {1 1/4} de arepa.').barras[0].n, 5, 'barras: número mixto pasado a pedazos');
+igual(B.deTexto('Un texto sin fracciones.'), null, 'barras: texto sin fracciones');
+igual(B.deTexto('Se comió {50/100} de la torta.'), null, 'barras: demasiados pedazos para dibujar');
+igual(B.deTexto('{1/2}, {2/4}, {4/8} y {8/16}').barras.length, 3, 'barras: máximo tres por paso');
+igual(B.notas({ barras: [{ id: 'x', n: 3, d: 4, color: 0 }] }).map(function (n) { return n[0]; }).join(','), '880,880,880,330', 'barras: tres toques agudos y uno grave');
+igual(B.normalizar({ id: 'x', n: 5, d: 4, color: 0 }).enteros, 2, 'barras: cinco cuartos ocupan dos enteros');
+igual(B.notas({ barras: [{ id: 'x', n: 1, d: 99, color: 0 }] }).length, 0, 'barras: no suena lo que no se puede dibujar');
+
+// ---------- 7. La calculadora que explica ----------
+var ESTADOS = { c0: 1, c1: 1, c2: 1, alt: 1, claro: 1, quitado: 1, vacio: 1 };
+var resueltos = 0;
+function mcdPropio(x, y) { while (y) { var t = x % y; x = y; y = t; } return x; }
+function alAzar(max) { return 1 + Math.floor(Math.random() * max); }
+
+function revisarSolucion(id, v, res) {
+  var donde = 'calculadora ' + id + ' ' + JSON.stringify(v);
+  resueltos++;
+  if (!res.pasos || res.pasos.length < 2) { falla(donde + ': muy pocos pasos'); return; }
+  if (!res.pasos[0].seccion) falla(donde + ': el primer paso no abre sección');
+  revisarTexto(res.resumen, donde + ' resumen');
+  res.pasos.forEach(function (p, k) {
+    revisarTexto(p.texto, donde + ' paso ' + (k + 1));
+    if (T.plano(p.texto).length > 720) falla(donde + ' paso ' + (k + 1) + ': demasiado largo (' + T.plano(p.texto).length + ' letras)');
+    if (!p.escena) return;
+    p.escena.barras.forEach(function (b) {
+      if (!(b.d >= 1) || b.d !== Math.floor(b.d)) { falla(donde + ' paso ' + (k + 1) + ': barra con denominador ' + b.d); return; }
+      var f = B.normalizar(b);
+      if (f.estados.length !== f.enteros * f.d) falla(donde + ' paso ' + (k + 1) + ': la barra no cuadra');
+      f.estados.forEach(function (e) { if (!ESTADOS[e]) falla(donde + ' paso ' + (k + 1) + ': estado desconocido ' + e); });
+      revisarTexto(String(b.rotulo), donde + ' paso ' + (k + 1) + ' rótulo');
+    });
+    if (B.notas(p.escena).length > 32) falla(donde + ' paso ' + (k + 1) + ': demasiados toques');
+  });
+}
+
+// El resultado debe valer lo mismo que num/den y estar simplificado.
+function revisarValor(id, v, res, num, den) {
+  var donde = 'calculadora ' + id + ' ' + JSON.stringify(v);
+  if (!res.valor) { falla(donde + ': no dio resultado'); return; }
+  if (res.valor.n * den !== num * res.valor.d) falla(donde + ': dio ' + res.valor.n + '/' + res.valor.d + ' y debía valer ' + num + '/' + den);
+  if (res.valor.n > 0 && mcdPropio(res.valor.n, res.valor.d) !== 1) falla(donde + ': el resultado ' + res.valor.n + '/' + res.valor.d + ' no quedó simplificado');
+}
+
+for (var vuelta = 0; vuelta < 3000; vuelta++) {
+  var tope = vuelta % 10 === 0 ? 99 : 12;
+  var v = { a: alAzar(tope), b: alAzar(tope), c: alAzar(tope), d: alAzar(tope), t: alAzar(vuelta % 7 === 0 ? 9999 : 60) };
+  var R = AE.Resolver, res;
+
+  res = R.resolver('sumar', v); revisarSolucion('sumar', v, res);
+  revisarValor('sumar', v, res, v.a * v.d + v.c * v.b, v.b * v.d);
+
+  res = R.resolver('restar', v); revisarSolucion('restar', v, res);
+  if (v.a * v.d < v.c * v.b) { if (res.valor !== null) falla('calculadora restar ' + JSON.stringify(v) + ': debía avisar que no se puede'); }
+  else revisarValor('restar', v, res, v.a * v.d - v.c * v.b, v.b * v.d);
+
+  res = R.resolver('multiplicar', v); revisarSolucion('multiplicar', v, res);
+  revisarValor('multiplicar', v, res, v.a * v.c, v.b * v.d);
+
+  res = R.resolver('dividir', v); revisarSolucion('dividir', v, res);
+  revisarValor('dividir', v, res, v.a * v.d, v.b * v.c);
+
+  res = R.resolver('simplificar', v); revisarSolucion('simplificar', v, res);
+  revisarValor('simplificar', v, res, v.a, v.b);
+
+  res = R.resolver('comparar', v); revisarSolucion('comparar', v, res);
+  var debe = v.a * v.d > v.c * v.b ? 1 : v.a * v.d < v.c * v.b ? 2 : 0;
+  if (res.gana !== debe) falla('calculadora comparar ' + JSON.stringify(v) + ': ganó ' + res.gana + ' y debía ganar ' + debe);
+
+  var w = { a: v.a, b: Math.max(2, v.b), t: v.t };
+  res = R.resolver('de', w); revisarSolucion('de', w, res);
+  revisarValor('de', w, res, w.a * w.t, w.b);
+}
+
+// Casos escogidos a mano
+igual(T.plano(AE.Resolver.resolver('sumar', { a: 1, b: 2, c: 1, d: 4 }).resumen), 'un medio más un cuarto igual a tres cuartos.', 'calculadora: un medio más un cuarto');
+igual(T.plano(AE.Resolver.resolver('sumar', { a: 3, b: 4, c: 1, d: 2 }).resumen), 'tres cuartos más un medio igual a cinco cuartos, o sea, un entero y un cuarto.', 'calculadora: resultado mayor que un entero');
+igual(T.plano(AE.Resolver.resolver('restar', { a: 1, b: 2, c: 1, d: 2 }).resumen), 'un medio menos un medio igual a cero.', 'calculadora: resta que da cero');
+igual(T.plano(AE.Resolver.resolver('dividir', { a: 3, b: 4, c: 1, d: 8 }).resumen), 'tres cuartos dividido entre un octavo igual a 6 enteros.', 'calculadora: división exacta');
+igual(T.plano(AE.Resolver.resolver('de', { a: 3, b: 4, t: 20 }).resumen), 'tres cuartos de 20 es 15.', 'calculadora: fracción de una cantidad');
+igual(T.plano(AE.Resolver.resolver('simplificar', { a: 12, b: 18 }).resumen), 'doce dieciochoavos simplificada es dos tercios.', 'calculadora: simplificar en dos pasos');
+igual(AE.Resolver.resolver('simplificar', { a: 12, b: 18 }).pasos.length, 4, 'calculadora: simplificar 12/18 toma dos divisiones');
+
+if (process.argv.indexOf('--calculadora') >= 0) {
+  [['sumar', { a: 2, b: 3, c: 1, d: 4 }], ['restar', { a: 3, b: 4, c: 1, d: 6 }], ['multiplicar', { a: 2, b: 3, c: 3, d: 4 }],
+    ['dividir', { a: 1, b: 2, c: 3, d: 1 }], ['simplificar', { a: 10, b: 4 }], ['comparar', { a: 2, b: 3, c: 3, d: 5 }],
+    ['de', { a: 2, b: 5, t: 30 }], ['de', { a: 2, b: 3, t: 10 }]].forEach(function (caso) {
+    var r = AE.Resolver.resolver(caso[0], caso[1]);
+    console.log('\n=== ' + caso[0] + ' ' + JSON.stringify(caso[1]));
+    r.pasos.forEach(function (p) {
+      console.log((p.seccion ? '[' + p.seccion + '] ' : '  ') + T.plano(p.texto));
+      if (p.escena) console.log('      barras: ' + p.escena.barras.map(function (b) { var f = B.normalizar(b); return T.plano(String(b.rotulo)) + ' (' + f.estados.join(' ') + ')'; }).join('  |  '));
+    });
+    console.log('  RESULTADO: ' + T.plano(r.resumen));
+  });
+}
+
 // ---------- Resultado ----------
 if (process.argv.indexOf('--muestra') >= 0) {
   AE.lecciones.forEach(function (l) {
@@ -159,6 +258,7 @@ if (process.argv.indexOf('--muestra') >= 0) {
 console.log('\nLecciones: ' + AE.lecciones.length + ' (' + mat + ' de matemáticas, ' + esp + ' de español)');
 console.log('Pasos de explicación: ' + totalPasos);
 console.log('Preguntas distintas: ' + totalPreguntas + '   Preguntas revisadas (con las generadas al azar): ' + revisadas);
+console.log('Ejercicios de la calculadora resueltos y comprobados: ' + resueltos);
 if (pocas.length) console.log('\nAvisos:\n  ' + pocas.join('\n  '));
 if (fallos.length) {
   console.log('\nFALLARON ' + fallos.length + ' revisiones:\n  ' + fallos.join('\n  '));

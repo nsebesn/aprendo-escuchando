@@ -11,6 +11,7 @@
       nivelVoz: 2,
       nombreVoz: null,
       vozActiva: true,
+      sonidoBarras: true,
       vioTutorial: false
     },
     cargar: function () {

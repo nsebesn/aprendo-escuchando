@@ -57,6 +57,7 @@
     clearTimeout(espera);
     clearTimeout(guardia);
     if (synth) synth.cancel();
+    AE.Sonidos.silenciar();
     enCurso = null;
     marcar(null);
     V.hablando = false;
@@ -64,7 +65,8 @@
 
   /*
    * lista: [{ voz: 'texto', el: elementoQueSeResalta, lento: true }]
-   * opciones: { alTerminar, retraso (ms), sinAviso }
+   * opciones: { alTerminar, retraso (ms), sinAviso, notas }
+   *   notas: lo que suena al terminar de hablar y antes del aviso final (las barras de fracciones)
    */
   V.decir = function (lista, opciones) {
     opciones = opciones || {};
@@ -91,9 +93,14 @@
       if (mio !== turno) return;
       if (i >= lista.length) {
         marcar(null);
-        V.hablando = false;
-        if (!opciones.sinAviso) AE.Sonidos.tocar('listo');
-        if (opciones.alTerminar) opciones.alTerminar();
+        var cerrar = function () {
+          if (mio !== turno) return;
+          V.hablando = false;
+          if (!opciones.sinAviso) AE.Sonidos.tocar('listo');
+          if (opciones.alTerminar) opciones.alTerminar();
+        };
+        var dura = opciones.notas && opciones.notas.length ? AE.Sonidos.secuencia(opciones.notas) : 0;
+        if (dura) espera = setTimeout(cerrar, dura + 200); else cerrar();
         return;
       }
       var item = lista[i++], hecho = false;

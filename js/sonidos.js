@@ -2,6 +2,7 @@
 (function (AE) {
   'use strict';
   var ctx = null;
+  var vivos = [];   // notas de una secuencia que todavía pueden estar sonando
 
   // Cada nota: [frecuencia, cuándo empieza, cuánto dura, volumen]
   var MELODIAS = {
@@ -36,18 +37,39 @@
       var c = contexto();
       if (!c) return;
       var t0 = c.currentTime + 0.01;
-      melodia.forEach(function (n) {
-        var osc = c.createOscillator(), gan = c.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = n[0];
-        gan.gain.setValueAtTime(0.0001, t0 + n[1]);
-        gan.gain.exponentialRampToValueAtTime(n[3], t0 + n[1] + 0.015);
-        gan.gain.exponentialRampToValueAtTime(0.0001, t0 + n[1] + n[2]);
-        osc.connect(gan);
-        gan.connect(c.destination);
-        osc.start(t0 + n[1]);
-        osc.stop(t0 + n[1] + n[2] + 0.03);
-      });
+      melodia.forEach(function (n) { nota(c, t0, n); });
+    },
+    // Toca una fila de notas [frecuencia, inicio, duración, volumen]. Devuelve cuánto dura, en milisegundos.
+    secuencia: function (notas) {
+      AE.Sonidos.silenciar();
+      if (!notas || !notas.length) return 0;
+      AE.Sonidos.registro.push('barras:' + notas.length);
+      var c = contexto(), fin = 0;
+      notas.forEach(function (n) { fin = Math.max(fin, n[1] + n[2]); });
+      if (c) {
+        var t0 = c.currentTime + 0.03;
+        vivos = notas.map(function (n) { return nota(c, t0, n); });
+      }
+      return Math.round(fin * 1000);
+    },
+    // Calla la secuencia que esté sonando (los sonidos cortos de aviso no se tocan).
+    silenciar: function () {
+      vivos.forEach(function (osc) { try { osc.stop(); } catch (e) { /* ya había terminado */ } });
+      vivos = [];
     }
   };
+
+  function nota(c, t0, n) {
+    var osc = c.createOscillator(), gan = c.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = n[0];
+    gan.gain.setValueAtTime(0.0001, t0 + n[1]);
+    gan.gain.exponentialRampToValueAtTime(n[3], t0 + n[1] + 0.015);
+    gan.gain.exponentialRampToValueAtTime(0.0001, t0 + n[1] + n[2]);
+    osc.connect(gan);
+    gan.connect(c.destination);
+    osc.start(t0 + n[1]);
+    osc.stop(t0 + n[1] + n[2] + 0.03);
+    return osc;
+  }
 })(window.AE = window.AE || {});

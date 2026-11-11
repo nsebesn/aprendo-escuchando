@@ -26,6 +26,7 @@
       items: [
         { texto: 'Matemáticas.', alElegir: function () { abrirArea('mat'); } },
         { texto: 'Español.', alElegir: function () { abrirArea('esp'); } },
+        { texto: 'Resolver mi propio ejercicio de fracciones.', alElegir: function () { AE.abrirCalculadora(); } },
         { texto: 'Cómo se maneja el programa.', alElegir: function () { abrirRecorrido(false); } },
         { texto: 'Ajustes de la voz.', alElegir: abrirAjustes }
       ]
@@ -132,6 +133,11 @@
           var nombre = V.siguienteVoz();
           M.decir(nombre ? 'Esta es otra voz. Si te gusta, déjala. Si no, vuelve a elegir cambiar de voz.'
             : 'Este aparato solo tiene una voz en español.');
+        } },
+        { texto: 'Apagar o encender los toques que acompañan a las fracciones.', alElegir: function () {
+          P.datos.sonidoBarras = P.datos.sonidoBarras === false;
+          P.guardar();
+          M.decir(P.datos.sonidoBarras ? 'Listo. Las fracciones vuelven a sonar con sus toques.' : 'Listo. Las fracciones ya no van a sonar con toques.');
         } },
         { texto: 'Apagar o encender mi voz. Apágala solo si usas un lector de pantalla.', alElegir: function () {
           V.activar(!V.activa);

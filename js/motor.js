@@ -24,7 +24,8 @@
       pregunta: 'Flecha abajo para oír las opciones una por una. Enter para elegir.',
       salir: 'Enter para volver.',
       primero: 'Primero escoge una opción con la flecha abajo.',
-      respondida: 'Ya respondiste esta pregunta. Flecha derecha para seguir.'
+      respondida: 'Ya respondiste esta pregunta. Flecha derecha para seguir.',
+      numero: 'Flecha arriba para subir el número y flecha abajo para bajarlo. También puedes escribirlo con las teclas de números. Enter para seguir.'
     },
     tactil: {
       seguir: 'Desliza a la derecha para seguir.',
@@ -32,7 +33,8 @@
       pregunta: 'Desliza hacia abajo para oír las opciones una por una. Doble toque para elegir.',
       salir: 'Doble toque para volver.',
       primero: 'Primero escoge una opción deslizando hacia abajo.',
-      respondida: 'Ya respondiste esta pregunta. Desliza a la derecha para seguir.'
+      respondida: 'Ya respondiste esta pregunta. Desliza a la derecha para seguir.',
+      numero: 'Desliza hacia arriba para subir el número y hacia abajo para bajarlo. Doble toque para seguir.'
     }
   };
   var NOMBRES = {
@@ -65,7 +67,10 @@
     $('migas').textContent = migas || '';
     $('titulo').textContent = titulo || '';
     $('texto').innerHTML = '';
+    $('pizarra').innerHTML = '';
+    $('pizarra').hidden = true;
     $('opciones').innerHTML = '';
+    $('opciones').className = '';
     $('retro').innerHTML = '';
     $('lugar').textContent = '';
     $('app').scrollTop = 0;
@@ -117,6 +122,12 @@
       ol.appendChild(li);
       return b;
     });
+  }
+
+  // Dibuja las barras de un paso y devuelve sus notas, para oírlas después de la explicación.
+  function verEscena(escena) {
+    var hay = AE.Barras.dibujar($('pizarra'), escena);
+    return hay && P.datos.sonidoBarras !== false ? AE.Barras.notas(escena) : [];
   }
 
   function enfocar(botones, foco) {
@@ -211,6 +222,11 @@
       } else if (x && x.espera) {
         cartas.push({ tipo: 'accion', seccion: seccion, abre: abre, texto: x.texto, espera: x.espera, bien: x.bien, ayuda: x.ayuda });
         abre = false;
+      } else if (x && typeof x.texto === 'string') {
+        // Paso que trae su propia escena de barras (los de la calculadora).
+        if (soloPractica) return;
+        cartas.push({ tipo: 'paso', seccion: seccion, abre: abre, texto: x.texto, escena: x.escena });
+        abre = false;
       } else {
         cartas.push({ tipo: 'pregunta', fuente: x, n: ++numero });
       }
@@ -240,6 +256,7 @@
     this.conRepaso = false;
     this.i = Math.max(0, Math.min(this.opc.desde || 0, this.cartas.length - 1));
     this.fresca = true;
+    AE.Barras.olvidar();
   }
 
   Leccion.prototype.lugar = function () {
@@ -280,7 +297,8 @@
     habla = habla.concat(parrafo(c.texto));
     if (c.tipo === 'paso' || c.hecha) habla = habla.concat(soloVoz(pista('seguir', repite)));
     $('lugar').textContent = this.lugar();
-    V.decir(habla);
+    // Las barras salen de la escena del paso o, en las lecciones, de las fracciones que nombra el texto.
+    V.decir(habla, { notas: verEscena(c.escena !== undefined ? c.escena : AE.Barras.deTexto(c.texto)) });
   };
 
   Leccion.prototype.verPregunta = function (c, motivo) {
@@ -387,9 +405,9 @@
         : 'Vale la pena oír esta lección otra vez otro día. Cada vez se entiende mejor.';
       habla = habla.concat(parrafo('Acertaste ' + this.aciertos + ' de ' + this.total + ' preguntas a la primera. ' + nota));
     }
-    if (!practica && def.resumen) habla = habla.concat(parrafo('Para recordar: ' + def.resumen, 'resumen'));
+    if (!practica && def.resumen) habla = habla.concat(parrafo((def.rotuloResumen || 'Para recordar: ') + def.resumen, 'resumen'));
     $('lugar').textContent = 'Fin';
-    V.decir(habla.concat(soloVoz(pista('salir', true))), { retraso: 700 });
+    V.decir(habla.concat(soloVoz(pista('salir', true))), { retraso: 700, notas: def.escenaFinal ? verEscena(def.escenaFinal) : [] });
   };
 
   Leccion.prototype.deletrear = function (c) {
@@ -471,6 +489,8 @@
   // =====================================================================
   M.Lista = Lista;
   M.Leccion = Leccion;
+  // Herramientas de dibujo y voz para otras pantallas (la calculadora).
+  M.dibujo = { limpiar: limpiar, parrafo: parrafo, soloVoz: soloVoz, vozDe: vozDe, opciones: opciones, pista: pista, verEscena: verEscena };
 
   M.actual = function () { return pila[pila.length - 1]; };
 

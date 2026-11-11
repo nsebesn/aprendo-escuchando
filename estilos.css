@@ -88,6 +88,44 @@ strong { color: var(--acento); }
 .entero { font-weight: bold; margin-left: 0.15em; }
 .letras { letter-spacing: 0.05em; font-weight: bold; white-space: nowrap; }
 
+/* ---------- Barras de fracciones ---------- */
+#pizarra { margin: 0.2em 0 0.9em; padding: 0.7em 0.6em; border: 2px solid var(--borde); border-radius: 0.5em; background: #0b0b0b; }
+.fila { display: flex; align-items: center; gap: 0.4em; margin: 0.35em 0; }
+.fila .signo { flex: none; width: 1em; text-align: center; font-weight: bold; color: var(--tenue); }
+.fila .rotulo { flex: none; min-width: 3.6em; text-align: center; font-size: 0.85em; }
+.pista { flex: 1; display: flex; min-width: 0; }
+.entero { display: flex; height: 2em; padding-right: 0.3em; }
+.seg { flex: 1; min-width: 0; border: 2px solid #f2f2f2; border-left-width: 0; background: #1b1b1b; transform-origin: bottom; animation: aparecer 0.38s ease-out both; animation-delay: calc(var(--i) * 55ms); }
+.seg:first-child { border-left-width: 2px; border-radius: 0.25em 0 0 0.25em; }
+.seg:last-child { border-radius: 0 0.25em 0.25em 0; }
+/* Cada estado se distingue por el color y también por la trama, para no depender solo del color. */
+.seg.c0 { background: #ffd60a; }
+.seg.c1 { background: repeating-linear-gradient(45deg, #5ac8fa 0 7px, #2a9fd8 7px 10px); }
+.seg.c2 { background: #6ee787; }
+.seg.alt { background: #ff9f0a; }
+.seg.claro { background: repeating-linear-gradient(90deg, #6b5a00 0 3px, #2a2400 3px 6px); }
+.seg.quitado { background: repeating-linear-gradient(135deg, #1b1b1b 0 6px, #8a8a8a 6px 8px); }
+.seg.grupo { margin-left: 0.28em; border-left-width: 2px; }
+.fila.quieta .seg { animation: none; }
+.fila.quieta .seg.corte { animation: cortar 0.9s ease-out both; animation-delay: calc(var(--i) * 30ms); }
+@keyframes aparecer { from { opacity: 0; transform: scaleY(0.15); } to { opacity: 1; transform: none; } }
+@keyframes cortar { 0% { box-shadow: inset 0.45em 0 0 #fff; } 100% { box-shadow: inset 0 0 0 #fff; } }
+
+/* El ejercicio escrito en grande, mientras se ponen los números */
+.expresion { display: flex; align-items: center; justify-content: center; gap: 0.5em; font-size: 1.7em; font-weight: bold; margin: 0.2em 0 0.5em; }
+.expresion .operador { color: var(--tenue); }
+.expresion .num, .expresion .den, .expresion .valor { min-width: 1.5em; padding: 0 0.2em; border-radius: 0.2em; text-align: center; }
+.expresion .activo { background: var(--acento); color: #000; box-shadow: 0 0 0 3px var(--acento); }
+.expresion .frac .num.activo { border-bottom-color: #000; }
+
+.nota-tactil { display: none; font-size: 0.7em; color: var(--tenue); }
+body.tactil .nota-tactil { display: block; }
+body.tactil:not(.con-lector) #opciones.para-raton { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .seg, .fila.quieta .seg.corte { animation: none; }
+}
+
 /* ---------- Opciones ---------- */
 #opciones { list-style: none; padding: 0; }
 #opciones li { margin-bottom: 0.5em; }

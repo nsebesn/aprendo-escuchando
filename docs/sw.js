@@ -1,9 +1,11 @@
 /* Guarda el programa en el aparato para que abra sin internet. Lo genera herramientas/construir.js */
-var CAJA = 'aprendo-escuchando-457b27f4f0';
+var CAJA = 'aprendo-escuchando-29362a896e';
 var ARCHIVOS = ["./","index.html","manifest.webmanifest","icono-180.png","icono-192.png","icono-512.png"];
 
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CAJA).then(function (caja) { return caja.addAll(ARCHIVOS); }).then(function () { return self.skipWaiting(); }));
+  // Se piden a internet sin pasar por la memoria del navegador, para no guardar una copia vieja.
+  var pedidos = ARCHIVOS.map(function (ruta) { return new Request(ruta, { cache: 'reload' }); });
+  e.waitUntil(caches.open(CAJA).then(function (caja) { return caja.addAll(pedidos); }).then(function () { return self.skipWaiting(); }));
 });
 
 // Al llegar una versión nueva, se borra la anterior.

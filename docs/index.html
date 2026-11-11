@@ -95,6 +95,44 @@ strong { color: var(--acento); }
 .entero { font-weight: bold; margin-left: 0.15em; }
 .letras { letter-spacing: 0.05em; font-weight: bold; white-space: nowrap; }
 
+/* ---------- Barras de fracciones ---------- */
+#pizarra { margin: 0.2em 0 0.9em; padding: 0.7em 0.6em; border: 2px solid var(--borde); border-radius: 0.5em; background: #0b0b0b; }
+.fila { display: flex; align-items: center; gap: 0.4em; margin: 0.35em 0; }
+.fila .signo { flex: none; width: 1em; text-align: center; font-weight: bold; color: var(--tenue); }
+.fila .rotulo { flex: none; min-width: 3.6em; text-align: center; font-size: 0.85em; }
+.pista { flex: 1; display: flex; min-width: 0; }
+.entero { display: flex; height: 2em; padding-right: 0.3em; }
+.seg { flex: 1; min-width: 0; border: 2px solid #f2f2f2; border-left-width: 0; background: #1b1b1b; transform-origin: bottom; animation: aparecer 0.38s ease-out both; animation-delay: calc(var(--i) * 55ms); }
+.seg:first-child { border-left-width: 2px; border-radius: 0.25em 0 0 0.25em; }
+.seg:last-child { border-radius: 0 0.25em 0.25em 0; }
+/* Cada estado se distingue por el color y también por la trama, para no depender solo del color. */
+.seg.c0 { background: #ffd60a; }
+.seg.c1 { background: repeating-linear-gradient(45deg, #5ac8fa 0 7px, #2a9fd8 7px 10px); }
+.seg.c2 { background: #6ee787; }
+.seg.alt { background: #ff9f0a; }
+.seg.claro { background: repeating-linear-gradient(90deg, #6b5a00 0 3px, #2a2400 3px 6px); }
+.seg.quitado { background: repeating-linear-gradient(135deg, #1b1b1b 0 6px, #8a8a8a 6px 8px); }
+.seg.grupo { margin-left: 0.28em; border-left-width: 2px; }
+.fila.quieta .seg { animation: none; }
+.fila.quieta .seg.corte { animation: cortar 0.9s ease-out both; animation-delay: calc(var(--i) * 30ms); }
+@keyframes aparecer { from { opacity: 0; transform: scaleY(0.15); } to { opacity: 1; transform: none; } }
+@keyframes cortar { 0% { box-shadow: inset 0.45em 0 0 #fff; } 100% { box-shadow: inset 0 0 0 #fff; } }
+
+/* El ejercicio escrito en grande, mientras se ponen los números */
+.expresion { display: flex; align-items: center; justify-content: center; gap: 0.5em; font-size: 1.7em; font-weight: bold; margin: 0.2em 0 0.5em; }
+.expresion .operador { color: var(--tenue); }
+.expresion .num, .expresion .den, .expresion .valor { min-width: 1.5em; padding: 0 0.2em; border-radius: 0.2em; text-align: center; }
+.expresion .activo { background: var(--acento); color: #000; box-shadow: 0 0 0 3px var(--acento); }
+.expresion .frac .num.activo { border-bottom-color: #000; }
+
+.nota-tactil { display: none; font-size: 0.7em; color: var(--tenue); }
+body.tactil .nota-tactil { display: block; }
+body.tactil:not(.con-lector) #opciones.para-raton { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .seg, .fila.quieta .seg.corte { animation: none; }
+}
+
 /* ---------- Opciones ---------- */
 #opciones { list-style: none; padding: 0; }
 #opciones li { margin-bottom: 0.5em; }
@@ -178,6 +216,8 @@ body.tactil.con-lector #gestos { display: none; }
       <li>Si el celular tiene encendido TalkBack o VoiceOver, apáguelo mientras se usa el programa.</li>
       <li><strong>Computador:</strong> flecha derecha, seguir. Flecha izquierda, atrás. Flechas arriba y abajo, moverse entre opciones. Enter, elegir. Barra espaciadora, repetir. Escape, menú. Letra L, deletrear. Teclas + y −, velocidad de la voz.</li>
       <li><strong>Celular o tablet:</strong> deslizar a la derecha, seguir. Deslizar a la izquierda, atrás. Deslizar arriba o abajo, moverse entre opciones. Doble toque, elegir. Un toque, repetir. Dejar el dedo quieto, menú. Toque con dos dedos, deletrear.</li>
+      <li>Las fracciones se muestran como barras de colores y también suenan: un toque agudo por cada parte que se toma y un toque grave por cada parte que no. Los toques se pueden apagar en «Ajustes de la voz».</li>
+      <li>En «Resolver mi propio ejercicio» se pone cualquier ejercicio de fracciones y el programa lo explica paso a paso.</li>
       <li>El avance se guarda en este aparato.</li>
       <li><strong>Para dejarlo en el celular:</strong> después de abrirlo una vez con internet, sigue funcionando sin internet. En el menú del navegador elija «Agregar a la pantalla de inicio» para que quede como una aplicación.</li>
     </ul>
@@ -188,6 +228,7 @@ body.tactil.con-lector #gestos { display: none; }
   <p id="migas"></p>
   <h1 id="titulo"></h1>
   <div id="texto"></div>
+  <div id="pizarra" hidden></div>
   <ol id="opciones"></ol>
   <div id="retro"></div>
 </main>
@@ -390,6 +431,7 @@ body.tactil.con-lector #gestos { display: none; }
       nivelVoz: 2,
       nombreVoz: null,
       vozActiva: true,
+      sonidoBarras: true,
       vioTutorial: false
     },
     cargar: function () {
@@ -414,6 +456,7 @@ body.tactil.con-lector #gestos { display: none; }
 (function (AE) {
   'use strict';
   var ctx = null;
+  var vivos = [];   // notas de una secuencia que todavía pueden estar sonando
 
   // Cada nota: [frecuencia, cuándo empieza, cuánto dura, volumen]
   var MELODIAS = {
@@ -448,20 +491,41 @@ body.tactil.con-lector #gestos { display: none; }
       var c = contexto();
       if (!c) return;
       var t0 = c.currentTime + 0.01;
-      melodia.forEach(function (n) {
-        var osc = c.createOscillator(), gan = c.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = n[0];
-        gan.gain.setValueAtTime(0.0001, t0 + n[1]);
-        gan.gain.exponentialRampToValueAtTime(n[3], t0 + n[1] + 0.015);
-        gan.gain.exponentialRampToValueAtTime(0.0001, t0 + n[1] + n[2]);
-        osc.connect(gan);
-        gan.connect(c.destination);
-        osc.start(t0 + n[1]);
-        osc.stop(t0 + n[1] + n[2] + 0.03);
-      });
+      melodia.forEach(function (n) { nota(c, t0, n); });
+    },
+    // Toca una fila de notas [frecuencia, inicio, duración, volumen]. Devuelve cuánto dura, en milisegundos.
+    secuencia: function (notas) {
+      AE.Sonidos.silenciar();
+      if (!notas || !notas.length) return 0;
+      AE.Sonidos.registro.push('barras:' + notas.length);
+      var c = contexto(), fin = 0;
+      notas.forEach(function (n) { fin = Math.max(fin, n[1] + n[2]); });
+      if (c) {
+        var t0 = c.currentTime + 0.03;
+        vivos = notas.map(function (n) { return nota(c, t0, n); });
+      }
+      return Math.round(fin * 1000);
+    },
+    // Calla la secuencia que esté sonando (los sonidos cortos de aviso no se tocan).
+    silenciar: function () {
+      vivos.forEach(function (osc) { try { osc.stop(); } catch (e) { /* ya había terminado */ } });
+      vivos = [];
     }
   };
+
+  function nota(c, t0, n) {
+    var osc = c.createOscillator(), gan = c.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = n[0];
+    gan.gain.setValueAtTime(0.0001, t0 + n[1]);
+    gan.gain.exponentialRampToValueAtTime(n[3], t0 + n[1] + 0.015);
+    gan.gain.exponentialRampToValueAtTime(0.0001, t0 + n[1] + n[2]);
+    osc.connect(gan);
+    gan.connect(c.destination);
+    osc.start(t0 + n[1]);
+    osc.stop(t0 + n[1] + n[2] + 0.03);
+    return osc;
+  }
 })(window.AE = window.AE || {});
 </script>
 <script>
@@ -524,6 +588,7 @@ body.tactil.con-lector #gestos { display: none; }
     clearTimeout(espera);
     clearTimeout(guardia);
     if (synth) synth.cancel();
+    AE.Sonidos.silenciar();
     enCurso = null;
     marcar(null);
     V.hablando = false;
@@ -531,7 +596,8 @@ body.tactil.con-lector #gestos { display: none; }
 
   /*
    * lista: [{ voz: 'texto', el: elementoQueSeResalta, lento: true }]
-   * opciones: { alTerminar, retraso (ms), sinAviso }
+   * opciones: { alTerminar, retraso (ms), sinAviso, notas }
+   *   notas: lo que suena al terminar de hablar y antes del aviso final (las barras de fracciones)
    */
   V.decir = function (lista, opciones) {
     opciones = opciones || {};
@@ -558,9 +624,14 @@ body.tactil.con-lector #gestos { display: none; }
       if (mio !== turno) return;
       if (i >= lista.length) {
         marcar(null);
-        V.hablando = false;
-        if (!opciones.sinAviso) AE.Sonidos.tocar('listo');
-        if (opciones.alTerminar) opciones.alTerminar();
+        var cerrar = function () {
+          if (mio !== turno) return;
+          V.hablando = false;
+          if (!opciones.sinAviso) AE.Sonidos.tocar('listo');
+          if (opciones.alTerminar) opciones.alTerminar();
+        };
+        var dura = opciones.notas && opciones.notas.length ? AE.Sonidos.secuencia(opciones.notas) : 0;
+        if (dura) espera = setTimeout(cerrar, dura + 200); else cerrar();
         return;
       }
       var item = lista[i++], hecho = false;
@@ -721,6 +792,589 @@ body.tactil.con-lector #gestos { display: none; }
 </script>
 <script>
 /*
+ * Barras de fracciones: la misma idea mostrada de dos maneras.
+ *
+ *   En pantalla: cada fracción es una barra partida en pedazos iguales,
+ *   con los pedazos que se toman en color. Sirve a quien tiene algo de visión
+ *   y a quien acompaña.
+ *
+ *   En sonido: un toque por cada pedazo. Agudo si el pedazo se toma, grave si no.
+ *   Sirve a quien no ve.
+ *
+ * Una "escena" es lo que se muestra en un paso:
+ *   { barras: [{ id, n, d, color, rotulo, partes, estados, grupo }], signo: '+' }
+ *
+ *   n, d      se pintan los primeros n pedazos de una barra partida en d
+ *   color     0 amarillo, 1 azul, 2 verde
+ *   partes    en vez de n: tramos seguidos, [[cuántos, estado], ...]
+ *   estados   en vez de n: el estado de cada pedazo, uno por uno
+ *   grupo     cada cuántos pedazos va una separación más gruesa
+ *
+ * Estados de un pedazo: c0, c1, c2 (tomado, en cada color), alt (tomado, color alterno),
+ * claro (parte de algo, pero no tomado), quitado (se restó) y vacio.
+ */
+(function (AE) {
+  'use strict';
+  var MAX_PEDAZOS = 40, MAX_ENTEROS = 4, MAX_SONIDOS = 32;
+  var TONOS = { c0: 880, c1: 1047, c2: 784, alt: 988, claro: 523, quitado: 262, vacio: 330 };
+  var recordado = {};   // id de barra -> en cuántos pedazos estaba partida la última vez que se dibujó
+
+  // Completa una barra: cuántos enteros ocupa y el estado de cada pedazo.
+  function normalizar(b) {
+    var estados = [];
+    if (b.estados) estados = b.estados.slice();
+    else if (b.partes) b.partes.forEach(function (p) { for (var k = 0; k < p[0]; k++) estados.push(p[1]); });
+    else for (var i = 0; i < b.n; i++) estados.push('c' + (b.color || 0));
+    var enteros = Math.max(1, Math.ceil(estados.length / b.d));
+    while (estados.length < enteros * b.d) estados.push('vacio');
+    return { id: b.id, d: b.d, enteros: enteros, estados: estados, grupo: b.grupo || 0, rotulo: b.rotulo || '' };
+  }
+
+  function dibujable(escena) {
+    if (!escena || !escena.barras || !escena.barras.length) return false;
+    return escena.barras.every(function (b) {
+      if (!(b.d >= 1) || b.d > MAX_PEDAZOS) return false;
+      return normalizar(b).enteros <= MAX_ENTEROS;
+    });
+  }
+
+  // Arma una escena con las fracciones que se nombran en un texto de lección (máximo tres).
+  function deTexto(crudo) {
+    var re = /\{(?:(\d+) )?(\d+)\/(\d+)\}/g, m, vistas = {}, barras = [];
+    while ((m = re.exec(String(crudo))) && barras.length < 3) {
+      var d = Number(m[3]), n = Number(m[2]) + (m[1] ? Number(m[1]) * d : 0);
+      if (d < 2 || d > 24 || n > 3 * d || vistas[n + '/' + d]) continue;
+      vistas[n + '/' + d] = true;
+      barras.push({ id: 't' + barras.length, n: n, d: d, color: barras.length, rotulo: m[0] });
+    }
+    return barras.length ? { barras: barras, signo: '' } : null;
+  }
+
+  // La escena convertida en notas: [frecuencia, cuándo empieza, cuánto dura, volumen]
+  function notas(escena) {
+    if (!dibujable(escena) || escena.barras.length > 3) return [];
+    var filas = escena.barras.map(normalizar), total = 0;
+    filas.forEach(function (f) { total += f.estados.length; });
+    if (total > MAX_SONIDOS) return [];
+    var salida = [], t = 0;
+    filas.forEach(function (f) {
+      f.estados.forEach(function (e, i) {
+        var suave = e === 'vacio' || e === 'quitado';
+        salida.push([TONOS[e] || TONOS.vacio, t, 0.075, suave ? 0.07 : 0.12]);
+        t += 0.11;
+        if ((i + 1) % f.d === 0 && i + 1 < f.estados.length) t += 0.13;   // pausa entre un entero y el siguiente
+      });
+      t += 0.34;   // pausa entre una barra y la siguiente
+    });
+    return salida;
+  }
+
+  // ---------- Dibujo ----------
+  function crear(etiqueta, clase) {
+    var el = document.createElement(etiqueta);
+    if (clase) el.className = clase;
+    return el;
+  }
+
+  // Dibuja la escena dentro de un contenedor. Devuelve true si dibujó algo.
+  function dibujar(contenedor, escena) {
+    contenedor.innerHTML = '';
+    if (!dibujable(escena)) {
+      contenedor.hidden = true;
+      return false;
+    }
+    contenedor.hidden = false;
+    var filas = escena.barras.map(normalizar), nuevo = {};
+    var unidades = Math.max.apply(null, filas.map(function (f) { return f.enteros; }));
+
+    filas.forEach(function (f, k) {
+      var antes = recordado[f.id];
+      // Si la barra ya estaba y ahora tiene más pedazos, se anima el corte de cada pedazo.
+      var corte = antes && f.d > antes && f.d % antes === 0 ? f.d / antes : 0;
+      var fila = crear('div', 'fila' + (antes ? ' quieta' : ''));
+      var signo = crear('span', 'signo');
+      signo.textContent = k === 0 ? '' : (f.id === 'r' ? '=' : (k === 1 ? escena.signo : ''));
+      var rotulo = crear('span', 'rotulo');
+      rotulo.innerHTML = AE.Texto.frases(f.rotulo).map(function (x) { return x.html; }).join(' ');
+      var pista = crear('div', 'pista');
+
+      for (var e = 0; e < f.enteros; e++) {
+        var entero = crear('div', 'entero');
+        entero.style.width = (100 / unidades) + '%';
+        for (var i = 0; i < f.d; i++) {
+          var pos = e * f.d + i;
+          var seg = crear('span', 'seg ' + f.estados[pos]);
+          if (corte && i % corte !== 0) seg.className += ' corte';
+          if (f.grupo && i > 0 && i % f.grupo === 0) seg.className += ' grupo';
+          seg.style.setProperty('--i', pos);
+          entero.appendChild(seg);
+        }
+        pista.appendChild(entero);
+      }
+      fila.appendChild(signo);
+      fila.appendChild(rotulo);
+      fila.appendChild(pista);
+      contenedor.appendChild(fila);
+      nuevo[f.id] = f.d;
+    });
+    recordado = nuevo;
+    return true;
+  }
+
+  AE.Barras = {
+    normalizar: normalizar,
+    dibujable: dibujable,
+    deTexto: deTexto,
+    notas: notas,
+    dibujar: dibujar,
+    olvidar: function () { recordado = {}; }
+  };
+})(window.AE = window.AE || {});
+</script>
+<script>
+/*
+ * Resuelve un ejercicio de fracciones que alguien escribe, y lo explica paso a paso.
+ *
+ * No toca la pantalla ni la voz: solo recibe números y devuelve una lista de pasos.
+ * Cada paso tiene el texto que se dice y la "escena" de barras que lo acompaña.
+ *
+ *   AE.Resolver.resolver('sumar', { a: 1, b: 2, c: 1, d: 4 })
+ *   -> { pasos: [{ seccion, texto, escena }], resumen, escenaFinal, valor }
+ */
+(function (AE) {
+  'use strict';
+  var U = AE.util, N = AE.Numeros;
+
+  // ---------- Maneras de decir las cosas ----------
+  function enteros(k) { return k === 1 ? 'un entero' : k + ' enteros'; }
+  function veces(k) { return k === 1 ? 'una vez' : k + ' veces'; }
+  // Una fracción con denominador 1 es un número entero.
+  function fr(n, d) { return d === 1 ? enteros(n) : '{' + n + '/' + d + '}'; }
+  function pedazos(d) { return d === 1 ? 'enteros' : N.parte(d, true); }
+
+  // ---------- Escenas: lo que se dibuja y suena en cada paso ----------
+  function barra(id, n, d, color, extra) {
+    var b = { id: id, n: n, d: d, color: color, rotulo: fr(n, d) };
+    Object.keys(extra || {}).forEach(function (k) { b[k] = extra[k]; });
+    return b;
+  }
+  function escena(barras, signo) { return { barras: barras, signo: signo || '' }; }
+
+  // ---------- Piezas que se repiten ----------
+  function explicarMcm(x, y) {
+    var mayor = Math.max(x, y), menor = Math.min(x, y), L = U.mcm(x, y), k = L / mayor;
+    if (L === mayor) {
+      return 'El ' + mayor + ' ya está en la tabla del ' + menor + ', porque ' + menor + ' × ' + (mayor / menor) + ' = ' + mayor +
+        '. Entonces el mínimo común múltiplo es ' + mayor + '.';
+    }
+    if (k <= 6) {
+      var lista = [];
+      for (var i = 1; i <= k; i++) lista.push(mayor * i);
+      return 'Digo los múltiplos de ' + mayor + ': ' + lista.join(', ') + '. El primero que el ' + menor + ' divide exacto es ' + L +
+        ', porque ' + L + ' ÷ ' + menor + ' = ' + (L / menor) + '. El mínimo común múltiplo es ' + L + '.';
+    }
+    return 'Voy diciendo los múltiplos de ' + mayor + ' hasta encontrar uno que el ' + menor + ' divida exacto. El primero es ' + L +
+      ', porque ' + mayor + ' × ' + k + ' = ' + L + ', y ' + L + ' ÷ ' + menor + ' = ' + (L / menor) + '. El mínimo común múltiplo es ' + L + '.';
+  }
+
+  // Explica cómo una fracción pasa al denominador común L.
+  function cambiar(n, d, L, cual) {
+    var k = L / d;
+    if (k === 1) return 'La ' + cual + ' fracción, ' + fr(n, d) + ', ya tiene denominador ' + L + '. Se queda igual.';
+    return 'Cambio la ' + cual + ' fracción. El ' + d + ' se multiplica por ' + k + ' para llegar a ' + L + '. Arriba hago lo mismo: ' +
+      n + ' × ' + k + ' = ' + (n * k) + '. Queda ' + fr(n * k, L) + '. Es la misma cantidad, en pedazos más pequeños.';
+  }
+
+  // Si el resultado vale más que un entero, lo dice también como número mixto.
+  function aMixto(n, d, pasos) {
+    if (d === 1 || n <= d) return fr(n, d);
+    var e = Math.floor(n / d), r = n % d, mixto = '{' + e + ' ' + r + '/' + d + '}';
+    pasos.push({
+      texto: 'El numerador es mayor que el denominador, así que el resultado vale más que un entero. Lo paso a número mixto: ' +
+        n + ' ÷ ' + d + ' = ' + e + ', y sobra ' + r + '. Son ' + mixto + '.',
+      escena: escena([barra('r', n, d, 2, { rotulo: mixto })])
+    });
+    return fr(n, d) + ', o sea, ' + mixto;
+  }
+
+  // Cierra un ejercicio: simplifica el resultado n/d y lo pasa a mixto si hace falta.
+  function cerrar(n, d, pasos) {
+    if (n === 0) {
+      pasos.push({ seccion: 'El resultado', texto: 'No queda nada. El resultado es cero.', escena: null });
+      return { n: 0, d: 1, texto: 'cero' };
+    }
+    var g = U.mcd(n, d), s = n / g, t = d / g;
+    if (t === 1) {
+      if (d > 1) {
+        pasos.push({
+          seccion: 'El resultado',
+          texto: 'El ' + n + ' se deja dividir exacto entre el ' + d + ': ' + n + ' ÷ ' + d + ' = ' + s + '. Eso quiere decir que los pedazos arman ' +
+            enteros(s) + ', sin que sobre nada.',
+          escena: escena([barra('r', n, d, 2, { rotulo: enteros(s) })])
+        });
+      }
+      return { n: s, d: 1, texto: enteros(s) };
+    }
+    if (g > 1) {
+      pasos.push({
+        seccion: 'El resultado',
+        texto: 'Reviso si se puede simplificar. El ' + n + ' y el ' + d + ' se dejan dividir entre ' + g + '. Arriba: ' + n + ' ÷ ' + g + ' = ' + s +
+          '. Abajo: ' + d + ' ÷ ' + g + ' = ' + t + '. Queda ' + fr(s, t) + '. Es la misma cantidad, dicha con números más pequeños.',
+        escena: escena([barra('r', s, t, 2)])
+      });
+    } else {
+      pasos.push({
+        seccion: 'El resultado',
+        texto: 'Reviso si se puede simplificar. El único número que divide exacto al ' + n + ' y al ' + d + ' es el 1. Entonces ' + fr(n, d) +
+          ' ya está en su forma más sencilla.',
+        escena: escena([barra('r', n, d, 2)])
+      });
+    }
+    return { n: s, d: t, texto: aMixto(s, t, pasos) };
+  }
+
+  function terminar(pasos, resumen, valor) {
+    var ultima = null;
+    for (var i = pasos.length - 1; i >= 0 && !ultima; i--) ultima = pasos[i].escena;
+    return { pasos: pasos, resumen: resumen, escenaFinal: ultima, valor: valor };
+  }
+
+  // =====================================================================
+  //  Sumar y restar
+  // =====================================================================
+  function sumarRestar(v, resta) {
+    var a = v.a, b = v.b, c = v.c, d = v.d;
+    var signo = resta ? '−' : '+', verbo = resta ? 'restar' : 'sumar';
+    var X = fr(a, b), Y = fr(c, d);
+    var A0 = barra('a', a, b, 0), B0 = barra('b', c, d, 1);
+    var pasos = [{
+      seccion: 'El ejercicio',
+      texto: 'Vamos a ' + verbo + ': ' + X + ' ' + signo + ' ' + Y + '. ' +
+        (resta ? 'A la primera cantidad le vamos a quitar la segunda.' : 'Vamos a juntar las dos cantidades.'),
+      escena: escena([A0, B0], signo)
+    }];
+
+    if (resta && a * d < c * b) {
+      pasos.push({
+        seccion: 'Paso a paso',
+        texto: 'Antes de restar, comparo las dos fracciones multiplicando en cruz. A la primera le toca ' + a + ' × ' + d + ' = ' + (a * d) +
+          '. A la segunda le toca ' + c + ' × ' + b + ' = ' + (c * b) + '. Como ' + (a * d) + ' es menos que ' + (c * b) +
+          ', la primera fracción es más pequeña que la segunda.',
+        escena: escena([A0, B0], signo)
+      });
+      pasos.push({
+        texto: 'No se puede quitar más de lo que hay. Por eso esta resta no se puede hacer así. Prueba otra vez, poniendo primero la fracción más grande.',
+        escena: escena([A0, B0], signo)
+      });
+      return terminar(pasos, 'a ' + X + ' no se le puede quitar ' + Y + ', porque la segunda es más grande que la primera.', null);
+    }
+
+    var L, A, C;
+    if (b === d) {
+      L = b; A = a; C = c;
+      pasos.push({
+        seccion: 'Paso a paso',
+        texto: 'Los denominadores son iguales: los dos son ' + b + '. Eso quiere decir que los pedazos son del mismo tamaño, así que se puede ' +
+          verbo + ' de una vez.',
+        escena: escena([A0, B0], signo)
+      });
+    } else {
+      L = U.mcm(b, d); A = a * L / b; C = c * L / d;
+      pasos.push({
+        seccion: 'Paso a paso',
+        texto: 'Los denominadores son distintos: ' + b + ' y ' + d + '. Los pedazos no son del mismo tamaño, así que todavía no se puede ' +
+          verbo + '. Primero hay que cambiarlos por pedazos iguales.',
+        escena: escena([A0, B0], signo)
+      });
+      pasos.push({
+        texto: 'Busco el mínimo común múltiplo de ' + b + ' y ' + d + '. ' + explicarMcm(b, d) + ' Ese va a ser el denominador de las dos fracciones.',
+        escena: escena([A0, B0], signo)
+      });
+      pasos.push({ texto: cambiar(a, b, L, 'primera'), escena: escena([barra('a', A, L, 0), B0], signo) });
+      pasos.push({ texto: cambiar(c, d, L, 'segunda'), escena: escena([barra('a', A, L, 0), barra('b', C, L, 1)], signo) });
+    }
+
+    var R = resta ? A - C : A + C;
+    var resultado = barra('r', R, L, 2, { partes: resta ? [[R, 'c0'], [C, 'quitado']] : [[A, 'c0'], [C, 'c1']] });
+    pasos.push({
+      texto: (b === d ? '' : 'Ahora los pedazos son del mismo tamaño. ') + (resta ? 'Resto' : 'Sumo') + ' los numeradores: ' + A + ' ' + signo + ' ' + C +
+        ' = ' + R + '. El denominador se queda en ' + L + ', porque los pedazos siguen siendo ' + pedazos(L) + '. Sale ' + fr(R, L) + '.',
+      escena: escena([barra('a', A, L, 0), barra('b', C, L, 1), resultado], signo)
+    });
+
+    var fin = cerrar(R, L, pasos);
+    return terminar(pasos, X + ' ' + signo + ' ' + Y + ' = ' + fin.texto + '.', { n: fin.n, d: fin.d });
+  }
+
+  // =====================================================================
+  //  Multiplicar
+  // =====================================================================
+  function multiplicar(v) {
+    var a = v.a, b = v.b, c = v.c, d = v.d, n = a * c, D = b * d;
+    var X = fr(a, b), Y = fr(c, d);
+    var A0 = barra('a', a, b, 0), B0 = barra('b', c, d, 1);
+    var sentido = b === 1 ? 'Esto quiere decir: ' + veces(a) + ' ' + Y + '.'
+      : 'Multiplicar por una fracción es sacar una parte. Esto quiere decir: ' + X + ' de ' + Y + '.';
+    var pasos = [{ seccion: 'El ejercicio', texto: 'Vamos a multiplicar: ' + X + ' × ' + Y + '. ' + sentido, escena: escena([A0, B0], '×') }];
+    pasos.push({
+      seccion: 'Paso a paso',
+      texto: 'Para multiplicar no hace falta igualar los denominadores. Se multiplica arriba por arriba, y abajo por abajo.',
+      escena: escena([A0, B0], '×')
+    });
+    pasos.push({ texto: 'Arriba por arriba: ' + a + ' × ' + c + ' = ' + n + '.', escena: escena([A0, B0], '×') });
+
+    // Dibujo: la segunda fracción, con cada pedazo vuelto a partir; en color fuerte, lo que se saca.
+    var producto = barra('r', n, D, 2);
+    if (a <= b && c <= d && b > 1 && d > 1) {
+      var estados = [];
+      for (var i = 0; i < D; i++) estados.push(Math.floor(i / b) < c ? (i % b < a ? 'c0' : 'claro') : 'vacio');
+      producto = barra('r', n, D, 2, { estados: estados, grupo: b });
+    }
+    pasos.push({
+      texto: 'Abajo por abajo: ' + b + ' × ' + d + ' = ' + D + '.' +
+        (b > 1 && d > 1 ? ' Los denominadores se multiplican porque cada pedazo se vuelve a partir.' : '') + ' Sale ' + fr(n, D) + '.',
+      escena: escena([B0, producto])
+    });
+    if (a < b) {
+      pasos.push({
+        texto: 'Fíjate: el resultado es más pequeño que ' + Y + '. Tiene sentido, porque se sacó solo una parte.',
+        escena: escena([B0, producto])
+      });
+    }
+    var fin = cerrar(n, D, pasos);
+    return terminar(pasos, X + ' × ' + Y + ' = ' + fin.texto + '.', { n: fin.n, d: fin.d });
+  }
+
+  // =====================================================================
+  //  Dividir
+  // =====================================================================
+  function dividir(v) {
+    var a = v.a, b = v.b, c = v.c, d = v.d, n = a * d, D = b * c;
+    var entero = d === 1;   // se divide entre un número entero: es repartir
+    var X = fr(a, b), Y = entero ? String(c) : fr(c, d);
+    var partes = c === 1 ? 'una sola parte' : c + ' partes iguales';
+    var A0 = barra('a', a, b, 0), B0 = barra('b', c, d, 1, { rotulo: Y });
+    var pasos = [{
+      seccion: 'El ejercicio',
+      texto: 'Vamos a dividir: ' + X + ' ÷ ' + Y + '. ' +
+        (entero ? 'Dividir entre ' + c + ' es repartir en ' + partes + '.' : 'La pregunta es: ¿cuántas veces cabe ' + Y + ' en ' + X + '?'),
+      escena: escena([A0, B0], '÷')
+    }];
+    pasos.push({
+      seccion: 'Paso a paso',
+      texto: 'Para dividir, se multiplica por la segunda cantidad volteada. La primera se deja igual: ' + X + '.',
+      escena: escena([A0, B0], '÷')
+    });
+    pasos.push({
+      texto: d === 1
+        ? 'La segunda es un número entero. El ' + c + ' es lo mismo que {' + c + '/1}. Volteado queda {1/' + c + '}.'
+        : 'La segunda se voltea: el número de abajo sube y el de arriba baja. ' + Y + ' pasa a ser {' + d + '/' + c + '}.' +
+          (c === 1 ? ' Eso es lo mismo que ' + d + '.' : ''),
+      escena: escena([A0, barra('b', d, c, 1, { rotulo: '{' + d + '/' + c + '}' })], '×')
+    });
+    pasos.push({
+      texto: 'Ahora multiplico. Arriba: ' + a + ' × ' + d + ' = ' + n + '. Abajo: ' + b + ' × ' + c + ' = ' + D + '. Sale ' + fr(n, D) + '.',
+      escena: escena([barra('r', n, D, 2)])
+    });
+    var fin = cerrar(n, D, pasos);
+
+    // Qué significa el resultado, con las dos fracciones en pedazos del mismo tamaño.
+    var L = U.mcm(b, d), A = a * L / b, C = c * L / d, grupos = Math.floor(A / C), estados = [];
+    for (var i = 0; i < A; i++) estados.push(i < grupos * C ? (Math.floor(i / C) % 2 === 0 ? 'c0' : 'alt') : 'claro');
+    var cabe = escena([barra('a', A, L, 0, { estados: estados, rotulo: X }), barra('b', C, L, 1, { rotulo: Y })]);
+    var significado;
+    if (entero) {
+      significado = 'Eso quiere decir que, al repartir ' + X + ' en ' + partes + ', cada parte es ' + fin.texto + '.';
+      cabe = escena([barra('r', fin.n, fin.d, 2)]);
+    } else if (fin.d === 1) significado = 'Eso quiere decir que ' + Y + ' cabe exactamente ' + veces(fin.n) + ' en ' + X + '.';
+    else if (fin.n < fin.d) significado = 'Eso quiere decir que ' + Y + ' no alcanza a caber completa en ' + X + '. Solo cabe una parte de ella.';
+    else significado = 'Eso quiere decir que ' + Y + ' cabe ' + veces(grupos) + ' en ' + X + ', y sobra un pedazo.';
+    pasos.push({ texto: significado, escena: cabe });
+    return terminar(pasos, X + ' ÷ ' + Y + ' = ' + fin.texto + '.', { n: fin.n, d: fin.d });
+  }
+
+  // =====================================================================
+  //  Simplificar
+  // =====================================================================
+  var PRIMOS = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
+  var PISTAS = { 2: 'Los dos son pares. ', 3: 'Los dos están en la tabla del 3. ', 5: 'Los dos terminan en 0 o en 5. ' };
+
+  function simplificar(v) {
+    var a = v.a, b = v.b, X = fr(a, b), n = a, d = b, hubo = false;
+    var pasos = [{
+      seccion: 'El ejercicio',
+      texto: 'Vamos a simplificar ' + X + '. Simplificar es escribir la misma cantidad con números más pequeños.',
+      escena: escena([barra('r', a, b, 0)])
+    }];
+    if (b === 1) {
+      pasos.push({ seccion: 'El resultado', texto: 'Esto ya es un número entero. No hay nada que simplificar.', escena: null });
+      return terminar(pasos, X + ' ya es un número entero.', { n: a, d: 1 });
+    }
+    while (U.mcd(n, d) > 1) {
+      var g = U.mcd(n, d), p = PRIMOS.filter(function (x) { return g % x === 0; })[0] || g;
+      pasos.push({
+        seccion: hubo ? undefined : 'Paso a paso',
+        texto: (hubo ? 'Todavía se puede. ' : 'Busco un número que divida exacto al ' + n + ' y al ' + d + '. ') + (PISTAS[p] || '') +
+          'Divido entre ' + p + '. Arriba: ' + n + ' ÷ ' + p + ' = ' + (n / p) + '. Abajo: ' + d + ' ÷ ' + p + ' = ' + (d / p) + '. Queda ' + fr(n / p, d / p) + '.',
+        escena: escena([barra('r', n / p, d / p, 0)])
+      });
+      n /= p; d /= p; hubo = true;
+    }
+    if (!hubo) {
+      pasos.push({
+        seccion: 'El resultado',
+        texto: 'Busco un número, aparte del 1, que divida exacto al ' + a + ' y al ' + b + '. Pruebo con el 2, con el 3, con el 5 y con los que siguen. No hay ninguno. Entonces ' +
+          X + ' ya está en su forma más sencilla. Es una fracción irreducible.',
+        escena: escena([barra('r', a, b, 2)])
+      });
+    } else {
+      pasos.push({
+        seccion: 'El resultado',
+        texto: 'Ya no hay ningún número, aparte del 1, que divida exacto a los dos. La forma más sencilla de ' + X + ' es ' + fr(n, d) + '. Es la misma cantidad.',
+        escena: escena([barra('r', n, d, 2)])
+      });
+    }
+    var texto = aMixto(n, d, pasos);
+    return terminar(pasos, hubo ? X + ' simplificada es ' + texto + '.' : X + ' ya está en su forma más sencilla.', { n: n, d: d });
+  }
+
+  // =====================================================================
+  //  Comparar
+  // =====================================================================
+  function comparar(v) {
+    var a = v.a, b = v.b, c = v.c, d = v.d, x = a * d, y = c * b;
+    var X = fr(a, b), Y = fr(c, d);
+    var A0 = barra('a', a, b, 0), B0 = barra('b', c, d, 1), dos = escena([A0, B0]);
+    var pasos = [{ seccion: 'El ejercicio', texto: 'Vamos a comparar ' + X + ' y ' + Y + ', para saber cuál es mayor.', escena: dos }];
+
+    if (b === d) {
+      pasos.push({
+        seccion: 'Paso a paso',
+        texto: 'Las dos tienen el mismo denominador: ' + b + '. Los pedazos son del mismo tamaño, así que gana la que tiene más pedazos. Comparo los numeradores: ' + a + ' y ' + c + '.',
+        escena: dos
+      });
+    } else if (a === c) {
+      pasos.push({
+        seccion: 'Paso a paso',
+        texto: 'Las dos tienen el mismo numerador: ' + a + '. Tienen la misma cantidad de pedazos, así que gana la que tiene los pedazos más grandes. Y los pedazos más grandes son los del denominador más pequeño.',
+        escena: dos
+      });
+    } else {
+      pasos.push({ seccion: 'Paso a paso', texto: 'Los numeradores y los denominadores son distintos, así que multiplico en cruz.', escena: dos });
+      pasos.push({ texto: 'El ' + a + ' de la primera por el ' + d + ' de la segunda: ' + a + ' × ' + d + ' = ' + x + '. Ese número le pertenece a la primera fracción.', escena: dos });
+      pasos.push({ texto: 'El ' + c + ' de la segunda por el ' + b + ' de la primera: ' + c + ' × ' + b + ' = ' + y + '. Ese número le pertenece a la segunda fracción.', escena: dos });
+      pasos.push({
+        texto: 'Esos dos números son los numeradores que saldrían si las dos fracciones se pasaran a pedazos del mismo tamaño: ' + fr(x, b * d) + ' y ' + fr(y, b * d) + '.',
+        escena: escena([barra('a', x, b * d, 0), barra('b', y, b * d, 1)])
+      });
+    }
+
+    var cierre, resumen, gana = x > y ? 1 : x < y ? 2 : 0;
+    if (gana === 0) {
+      cierre = 'Las dos dan lo mismo. Las fracciones valen igual: son equivalentes.';
+      resumen = X + ' y ' + Y + ' valen lo mismo.';
+    } else {
+      var mayor = gana === 1 ? X : Y, menor = gana === 1 ? Y : X;
+      cierre = (b === d ? 'Como ' + Math.max(a, c) + ' es más que ' + Math.min(a, c)
+        : a === c ? 'Como ' + Math.min(b, d) + ' es el denominador más pequeño'
+        : 'Como ' + Math.max(x, y) + ' es más que ' + Math.min(x, y)) +
+        ', gana la ' + (gana === 1 ? 'primera' : 'segunda') + '. ' + mayor + ' es mayor que ' + menor + '.';
+      resumen = mayor + ' es mayor que ' + menor + '.';
+    }
+    pasos.push({ seccion: 'El resultado', texto: cierre, escena: dos });
+    var fin = terminar(pasos, resumen, null);
+    fin.gana = gana;
+    return fin;
+  }
+
+  // =====================================================================
+  //  Fracción de una cantidad
+  // =====================================================================
+  function deCantidad(v) {
+    var n = v.a, d = v.b, T = v.t, X = fr(n, d);
+    var pasos = [{ seccion: 'El ejercicio', texto: 'Vamos a sacar ' + X + ' de ' + T + '.', escena: escena([barra('a', n, d, 0)]) }];
+
+    if (T % d === 0) {
+      var k = T / d, R = n * k;
+      // Se dibuja la cantidad como una fila de unidades agrupadas, si no es demasiado larga.
+      var unidades = function (tomadas) {
+        var estados = [];
+        for (var i = 0; i < Math.max(T, tomadas); i++) estados.push(i < tomadas ? 'c0' : 'claro');
+        return escena([barra('u', tomadas, Math.max(T, 1), 0, { estados: estados, grupo: k, d: T, rotulo: tomadas ? R + ' de ' + T : String(T) })]);
+      };
+      pasos.push({
+        seccion: 'Paso a paso',
+        texto: 'Primer paso, el denominador. El ' + d + ' dice: reparte ' + T + ' en ' + d + ' grupos iguales. ' + T + ' ÷ ' + d + ' = ' + k + '. Cada grupo tiene ' + k + '.',
+        escena: unidades(0)
+      });
+      pasos.push({
+        texto: 'Segundo paso, el numerador. El ' + n + ' dice: toma ' + (n === 1 ? 'un grupo' : n + ' grupos') + '. ' + n + ' × ' + k + ' = ' + R + '.',
+        escena: unidades(R)
+      });
+      pasos.push({
+        seccion: 'El resultado',
+        texto: 'Entonces ' + X + ' de ' + T + ' es ' + R + '.' +
+          (n < d ? ' Tiene sentido: es menos que ' + T + ', porque se tomó solo una parte.'
+            : n === d ? ' Es todo, porque la fracción vale un entero.'
+            : ' Es más que ' + T + ', porque la fracción vale más que un entero.'),
+        escena: unidades(R)
+      });
+      return terminar(pasos, X + ' de ' + T + ' es ' + R + '.', { n: R, d: 1 });
+    }
+
+    var P = n * T;
+    pasos.push({
+      seccion: 'Paso a paso',
+      texto: 'El ' + T + ' no se deja repartir exacto en ' + d + ' grupos: sobra ' + (T % d) + '. Entonces lo resuelvo como una multiplicación: ' + X + ' × ' + T + '.',
+      escena: escena([barra('a', n, d, 0)])
+    });
+    pasos.push({
+      texto: 'Multiplico el numerador por la cantidad: ' + n + ' × ' + T + ' = ' + P + '. El denominador se queda en ' + d + '. Sale ' + fr(P, d) + '.',
+      escena: escena([barra('r', P, d, 2)])
+    });
+    var fin = cerrar(P, d, pasos);
+    return terminar(pasos, X + ' de ' + T + ' es ' + fin.texto + '.', { n: fin.n, d: fin.d });
+  }
+
+  // =====================================================================
+  //  Lo que se ofrece en el menú
+  // =====================================================================
+  function campo(clave, nombre, ayuda, inicial, min, max) {
+    return { clave: clave, nombre: nombre, ayuda: ayuda, inicial: inicial, min: min || 1, max: max || 99 };
+  }
+  var ARRIBA = 'Es el número de arriba.', ABAJO = 'Es el número de abajo.';
+  var PRIMERA = [campo('a', 'el numerador de la primera fracción', ARRIBA, 1), campo('b', 'el denominador de la primera fracción', ABAJO, 2)];
+  var SEGUNDA = [campo('c', 'el numerador de la segunda fracción', ARRIBA, 1), campo('d', 'el denominador de la segunda fracción', ABAJO, 4)];
+  var DOS = PRIMERA.concat(SEGUNDA);
+  function dosFracciones(signo) { return [{ f: ['a', 'b'] }, signo, { f: ['c', 'd'] }]; }
+
+  var OPERACIONES = [
+    { id: 'sumar', nombre: 'Sumar dos fracciones.', campos: DOS, vista: dosFracciones('+'), resolver: function (v) { return sumarRestar(v, false); } },
+    { id: 'restar', nombre: 'Restar dos fracciones.', campos: DOS, vista: dosFracciones('−'), resolver: function (v) { return sumarRestar(v, true); } },
+    { id: 'multiplicar', nombre: 'Multiplicar dos fracciones.', campos: DOS, vista: dosFracciones('×'), resolver: multiplicar },
+    { id: 'dividir', nombre: 'Dividir dos fracciones.', campos: DOS, vista: dosFracciones('÷'), resolver: dividir },
+    { id: 'simplificar', nombre: 'Simplificar una fracción.',
+      campos: [campo('a', 'el numerador de la fracción', ARRIBA, 6), campo('b', 'el denominador de la fracción', ABAJO, 8)],
+      vista: [{ f: ['a', 'b'] }], resolver: simplificar },
+    { id: 'comparar', nombre: 'Comparar dos fracciones.', campos: DOS, vista: [{ f: ['a', 'b'] }, 'y', { f: ['c', 'd'] }], resolver: comparar },
+    { id: 'de', nombre: 'Sacar una fracción de una cantidad.',
+      campos: [campo('a', 'el numerador de la fracción', ARRIBA, 3), campo('b', 'el denominador de la fracción', ABAJO, 4, 2),
+        campo('t', 'la cantidad', 'Es el número del que se va a sacar la fracción.', 20, 1, 9999)],
+      vista: [{ f: ['a', 'b'] }, 'de', { v: 't' }], resolver: deCantidad }
+  ];
+
+  AE.Resolver = {
+    OPERACIONES: OPERACIONES,
+    resolver: function (id, valores) {
+      var op = OPERACIONES.filter(function (o) { return o.id === id; })[0];
+      if (!op) throw new Error('Operación desconocida: ' + id);
+      return op.resolver(valores);
+    }
+  };
+})(window.AE = window.AE || {});
+</script>
+<script>
+/*
  * El motor: decide qué se muestra y qué se dice según lo que haga el estudiante.
  *
  * Hay dos clases de pantalla:
@@ -746,7 +1400,8 @@ body.tactil.con-lector #gestos { display: none; }
       pregunta: 'Flecha abajo para oír las opciones una por una. Enter para elegir.',
       salir: 'Enter para volver.',
       primero: 'Primero escoge una opción con la flecha abajo.',
-      respondida: 'Ya respondiste esta pregunta. Flecha derecha para seguir.'
+      respondida: 'Ya respondiste esta pregunta. Flecha derecha para seguir.',
+      numero: 'Flecha arriba para subir el número y flecha abajo para bajarlo. También puedes escribirlo con las teclas de números. Enter para seguir.'
     },
     tactil: {
       seguir: 'Desliza a la derecha para seguir.',
@@ -754,7 +1409,8 @@ body.tactil.con-lector #gestos { display: none; }
       pregunta: 'Desliza hacia abajo para oír las opciones una por una. Doble toque para elegir.',
       salir: 'Doble toque para volver.',
       primero: 'Primero escoge una opción deslizando hacia abajo.',
-      respondida: 'Ya respondiste esta pregunta. Desliza a la derecha para seguir.'
+      respondida: 'Ya respondiste esta pregunta. Desliza a la derecha para seguir.',
+      numero: 'Desliza hacia arriba para subir el número y hacia abajo para bajarlo. Doble toque para seguir.'
     }
   };
   var NOMBRES = {
@@ -787,7 +1443,10 @@ body.tactil.con-lector #gestos { display: none; }
     $('migas').textContent = migas || '';
     $('titulo').textContent = titulo || '';
     $('texto').innerHTML = '';
+    $('pizarra').innerHTML = '';
+    $('pizarra').hidden = true;
     $('opciones').innerHTML = '';
+    $('opciones').className = '';
     $('retro').innerHTML = '';
     $('lugar').textContent = '';
     $('app').scrollTop = 0;
@@ -839,6 +1498,12 @@ body.tactil.con-lector #gestos { display: none; }
       ol.appendChild(li);
       return b;
     });
+  }
+
+  // Dibuja las barras de un paso y devuelve sus notas, para oírlas después de la explicación.
+  function verEscena(escena) {
+    var hay = AE.Barras.dibujar($('pizarra'), escena);
+    return hay && P.datos.sonidoBarras !== false ? AE.Barras.notas(escena) : [];
   }
 
   function enfocar(botones, foco) {
@@ -933,6 +1598,11 @@ body.tactil.con-lector #gestos { display: none; }
       } else if (x && x.espera) {
         cartas.push({ tipo: 'accion', seccion: seccion, abre: abre, texto: x.texto, espera: x.espera, bien: x.bien, ayuda: x.ayuda });
         abre = false;
+      } else if (x && typeof x.texto === 'string') {
+        // Paso que trae su propia escena de barras (los de la calculadora).
+        if (soloPractica) return;
+        cartas.push({ tipo: 'paso', seccion: seccion, abre: abre, texto: x.texto, escena: x.escena });
+        abre = false;
       } else {
         cartas.push({ tipo: 'pregunta', fuente: x, n: ++numero });
       }
@@ -962,6 +1632,7 @@ body.tactil.con-lector #gestos { display: none; }
     this.conRepaso = false;
     this.i = Math.max(0, Math.min(this.opc.desde || 0, this.cartas.length - 1));
     this.fresca = true;
+    AE.Barras.olvidar();
   }
 
   Leccion.prototype.lugar = function () {
@@ -1002,7 +1673,8 @@ body.tactil.con-lector #gestos { display: none; }
     habla = habla.concat(parrafo(c.texto));
     if (c.tipo === 'paso' || c.hecha) habla = habla.concat(soloVoz(pista('seguir', repite)));
     $('lugar').textContent = this.lugar();
-    V.decir(habla);
+    // Las barras salen de la escena del paso o, en las lecciones, de las fracciones que nombra el texto.
+    V.decir(habla, { notas: verEscena(c.escena !== undefined ? c.escena : AE.Barras.deTexto(c.texto)) });
   };
 
   Leccion.prototype.verPregunta = function (c, motivo) {
@@ -1109,9 +1781,9 @@ body.tactil.con-lector #gestos { display: none; }
         : 'Vale la pena oír esta lección otra vez otro día. Cada vez se entiende mejor.';
       habla = habla.concat(parrafo('Acertaste ' + this.aciertos + ' de ' + this.total + ' preguntas a la primera. ' + nota));
     }
-    if (!practica && def.resumen) habla = habla.concat(parrafo('Para recordar: ' + def.resumen, 'resumen'));
+    if (!practica && def.resumen) habla = habla.concat(parrafo((def.rotuloResumen || 'Para recordar: ') + def.resumen, 'resumen'));
     $('lugar').textContent = 'Fin';
-    V.decir(habla.concat(soloVoz(pista('salir', true))), { retraso: 700 });
+    V.decir(habla.concat(soloVoz(pista('salir', true))), { retraso: 700, notas: def.escenaFinal ? verEscena(def.escenaFinal) : [] });
   };
 
   Leccion.prototype.deletrear = function (c) {
@@ -1193,6 +1865,8 @@ body.tactil.con-lector #gestos { display: none; }
   // =====================================================================
   M.Lista = Lista;
   M.Leccion = Leccion;
+  // Herramientas de dibujo y voz para otras pantallas (la calculadora).
+  M.dibujo = { limpiar: limpiar, parrafo: parrafo, soloVoz: soloVoz, vozDe: vozDe, opciones: opciones, pista: pista, verEscena: verEscena };
 
   M.actual = function () { return pila[pila.length - 1]; };
 
@@ -1694,6 +2368,9 @@ body.tactil.con-lector #gestos { display: none; }
       'Vuelve a doblar la hoja por la mitad, y luego dóblala otra vez por la mitad. Ábrela y toca los dobleces. Ahora hay cuatro partes iguales. Cada una se llama *un cuarto*.',
       'Si tomas una de esas cuatro partes, tienes un cuarto de la hoja. Si tomas tres, tienes tres cuartos de la hoja. Eso es una *fracción*: un número que dice cuántas partes tomas, de las partes iguales en que partiste el entero.',
       'Una fracción siempre responde dos preguntas. La primera: ¿en cuántas partes iguales partí el entero? La segunda: ¿cuántas de esas partes tomo?',
+      '## Las fracciones también suenan',
+      'En este programa, las fracciones también se oyen. Después de una explicación vas a escuchar unos toques. Cada toque es una parte del entero. Un toque agudo es una parte que se toma. Un toque grave es una parte que no se toma.',
+      'Escucha cómo suena {3/4}: tres toques agudos, por las tres partes que se toman, y un toque grave, por la parte que queda.',
       '## De dónde sale',
       '¿Por qué las partes tienen que ser iguales? Imagina que partes una arepa con un amigo, pero le das un pedazo grande y te quedas con uno chiquito. Hay dos pedazos, pero no es justo, y nadie diría que te tocó la mitad.',
       'Solo cuando los pedazos son del mismo tamaño puedo decir con seguridad cuánto tiene cada uno. Por eso la fracción exige partes iguales: para que el número diga la verdad.',
@@ -4135,6 +4812,198 @@ body.tactil.con-lector #gestos { display: none; }
 })(window.AE = window.AE || {});
 </script>
 <script>
+/*
+ * "Resolver mi propio ejercicio": la calculadora que explica.
+ *
+ * Tres pantallas, una detrás de otra:
+ *   1. Un menú para elegir la operación.
+ *   2. Numeros: se pone cada número del ejercicio, uno por uno.
+ *   3. Una lección armada en el momento, con la solución paso a paso (la arma resolver.js).
+ */
+(function (AE) {
+  'use strict';
+  var M = AE.Motor, V = AE.Voz, S = AE.Sonidos, D = M.dibujo;
+  function $(id) { return document.getElementById(id); }
+  function crear(etiqueta, clase, texto) {
+    var el = document.createElement(etiqueta);
+    if (clase) el.className = clase;
+    if (texto !== undefined) el.textContent = texto;
+    return el;
+  }
+
+  var ENTRE_TECLAS = 1500;   // milisegundos para seguir escribiendo el mismo número (12 = un 1 y un 2)
+
+  // =====================================================================
+  //  Pantalla para poner los números
+  // =====================================================================
+  function Numeros(op, alTerminar) {
+    var yo = this;
+    this.op = op;
+    this.alTerminar = alTerminar;
+    this.k = 0;
+    this.valores = {};
+    this.ultimaTecla = 0;
+    op.campos.forEach(function (c) { yo.valores[c.clave] = c.inicial; });
+  }
+
+  Numeros.prototype.campo = function () { return this.op.campos[this.k]; };
+
+  // El ejercicio escrito en grande, con el número que se está poniendo resaltado.
+  Numeros.prototype.expresion = function () {
+    var v = this.valores, activa = this.campo().clave, p = crear('p', 'expresion');
+    function numero(clave, clase) {
+      return crear('span', clase + (clave === activa ? ' activo' : ''), String(v[clave]));
+    }
+    this.op.vista.forEach(function (pieza) {
+      if (typeof pieza === 'string') { p.appendChild(crear('span', 'operador', pieza)); return; }
+      if (pieza.v) { p.appendChild(numero(pieza.v, 'valor')); return; }
+      var frac = crear('span', 'frac');
+      frac.appendChild(numero(pieza.f[0], 'num'));
+      frac.appendChild(numero(pieza.f[1], 'den'));
+      p.appendChild(frac);
+    });
+    return p;
+  };
+
+  // Las barras de las fracciones que se llevan escritas; cambian mientras se ponen los números.
+  Numeros.prototype.escena = function () {
+    var v = this.valores, barras = [];
+    this.op.vista.forEach(function (pieza) {
+      if (!pieza.f) return;
+      var n = v[pieza.f[0]], d = v[pieza.f[1]];
+      barras.push({ id: pieza.f[0], n: n, d: d, color: barras.length, rotulo: d > 1 ? '{' + n + '/' + d + '}' : String(n) });
+    });
+    return { barras: barras, signo: '' };
+  };
+
+  Numeros.prototype.pintar = function () {
+    D.limpiar('Resolver mi ejercicio', this.op.nombre.replace(/\.$/, ''));
+    $('texto').appendChild(this.expresion());
+    var c = this.campo();
+    var frases = D.parrafo('Pon ' + c.nombre + '. ' + c.ayuda + ' Ahora vale ' + this.valores[c.clave] + '.');
+    AE.Barras.dibujar($('pizarra'), this.escena());
+    // Botones para quien usa el ratón. En pantalla táctil se usan los gestos y estos botones se esconden.
+    D.opciones([{ crudo: 'Subir el número' }, { crudo: 'Bajar el número' }], -1);
+    $('opciones').className = 'para-raton';
+    $('texto').appendChild(crear('p', 'nota-tactil', 'Desliza hacia arriba para subir el número y hacia abajo para bajarlo. Doble toque para seguir.'));
+    $('lugar').textContent = 'Número ' + (this.k + 1) + ' de ' + this.op.campos.length;
+    return frases;
+  };
+
+  Numeros.prototype.entrar = function (motivo) {
+    var habla = motivo === 'nuevo' ? D.soloVoz(this.op.nombre + ' Vamos a poner los números, uno por uno.') : [];
+    habla = habla.concat(this.pintar(), D.soloVoz(D.pista('numero', motivo === 'repetir')));
+    V.decir(habla);
+  };
+
+  // Cambia el número y lo dice, sin repetir toda la explicación.
+  Numeros.prototype.poner = function (valor) {
+    this.valores[this.campo().clave] = valor;
+    this.pintar();
+    V.decir(D.soloVoz(String(valor)), { sinAviso: true });
+  };
+
+  Numeros.prototype.confirmar = function () {
+    var c = this.campo(), valor = this.valores[c.clave], v = this.valores;
+    if (valor < c.min) {
+      S.tocar('tope');
+      M.decir(c.min === 1 ? 'Ese número no sirve aquí. Tiene que ser por lo menos 1.' : 'Aquí el número tiene que ser por lo menos ' + c.min + '.');
+      return;
+    }
+    if (this.k === this.op.campos.length - 1) {
+      S.tocar('entrar');
+      this.alTerminar(this.valores);
+      return;
+    }
+    // Al cerrar una fracción, se dice completa antes de pedir el siguiente número.
+    var dicha = '';
+    this.op.vista.forEach(function (pieza) {
+      if (pieza.f && pieza.f[1] === c.clave) dicha = v[pieza.f[1]] > 1 ? 'La fracción es {' + v[pieza.f[0]] + '/' + v[pieza.f[1]] + '}.' : 'Es el número entero ' + v[pieza.f[0]] + '.';
+    });
+    this.k++;
+    this.ultimaTecla = 0;
+    S.tocar('mover');
+    V.decir(D.soloVoz(dicha).concat(this.pintar(), D.soloVoz(D.pista('numero'))));
+  };
+
+  Numeros.prototype.accion = function (a, extra) {
+    var c = this.campo(), valor = this.valores[c.clave];
+    if (a === 'opcion') a = extra === 0 ? 'arriba' : 'abajo';
+    if (a === 'arriba' || a === 'abajo') {
+      var nuevo = valor + (a === 'arriba' ? 1 : -1);
+      if (nuevo < c.min || nuevo > c.max) {
+        S.tocar('tope');
+        M.decir(nuevo < c.min ? 'No puede ser menos de ' + c.min + '.' : 'No puede ser más de ' + c.max + '.');
+        return;
+      }
+      S.tocar('mover');
+      this.poner(nuevo);
+    } else if (a === 'numero') {
+      // Varias teclas seguidas forman un número de varias cifras.
+      var ahora = Date.now(), sigue = ahora - this.ultimaTecla < ENTRE_TECLAS;
+      var armado = sigue ? valor * 10 + extra : extra;
+      if (armado > c.max) armado = extra;
+      this.ultimaTecla = ahora;
+      this.poner(armado);
+    } else if (a === 'elegir' || a === 'siguiente') {
+      this.confirmar();
+    } else if (a === 'anterior') {
+      if (this.k === 0) { M.volver(); return; }
+      this.k--;
+      this.ultimaTecla = 0;
+      S.tocar('mover');
+      this.entrar('paso');
+    } else if (a === 'menu') {
+      M.volver();
+    } else if (a === 'repetir') {
+      this.entrar('repetir');
+    } else if (a === 'deletrear') {
+      M.decir('Aquí no hay palabras para deletrear.');
+    }
+  };
+
+  // =====================================================================
+  //  La solución, como una lección armada en el momento
+  // =====================================================================
+  function explicar(op, valores) {
+    var solucion = op.resolver(valores), pasos = [];
+    solucion.pasos.forEach(function (p) {
+      if (p.seccion) pasos.push('## ' + p.seccion);
+      pasos.push({ texto: p.texto, escena: p.escena || null });
+    });
+    M.abrir(new M.Leccion({
+      id: 'calculadora',
+      titulo: op.nombre.replace(/\.$/, ''),
+      sinGuardar: true,
+      cierre: 'Ejercicio resuelto.',
+      rotuloResumen: 'Resultado: ',
+      resumen: solucion.resumen,
+      escenaFinal: solucion.escenaFinal,
+      pasos: pasos
+    }, {
+      migas: 'Resolver mi ejercicio',
+      // Al terminar se vuelve al menú de operaciones; al salir antes, a los números, para poder cambiarlos.
+      alSalir: function (terminada) { M.volver(terminada ? 2 : 1); }
+    }));
+  }
+
+  AE.abrirCalculadora = function () {
+    var items = AE.Resolver.OPERACIONES.map(function (op) {
+      return { texto: op.nombre, alElegir: function () { M.abrir(new Numeros(op, function (valores) { explicar(op, valores); })); } };
+    });
+    items.push({ texto: 'Volver al menú principal.', alElegir: function () { M.volver(); } });
+    M.abrir(new M.Lista({
+      migas: 'Menú principal',
+      titulo: 'Resolver mi propio ejercicio',
+      intro: 'Aquí pones tu propio ejercicio de fracciones, y yo lo resuelvo paso a paso. Después de cada paso vas a oír unos toques. Cada toque es un pedazo: un toque agudo es un pedazo que se toma, y un toque grave es un pedazo que no se toma.',
+      items: items
+    }));
+  };
+
+  AE.Calculadora = { Numeros: Numeros, explicar: explicar };
+})(window.AE = window.AE || {});
+</script>
+<script>
 /* Menús del programa: principal, áreas, lecciones, recorrido inicial y ajustes de la voz. */
 (function (AE) {
   'use strict';
@@ -4163,6 +5032,7 @@ body.tactil.con-lector #gestos { display: none; }
       items: [
         { texto: 'Matemáticas.', alElegir: function () { abrirArea('mat'); } },
         { texto: 'Español.', alElegir: function () { abrirArea('esp'); } },
+        { texto: 'Resolver mi propio ejercicio de fracciones.', alElegir: function () { AE.abrirCalculadora(); } },
         { texto: 'Cómo se maneja el programa.', alElegir: function () { abrirRecorrido(false); } },
         { texto: 'Ajustes de la voz.', alElegir: abrirAjustes }
       ]
@@ -4270,6 +5140,11 @@ body.tactil.con-lector #gestos { display: none; }
           M.decir(nombre ? 'Esta es otra voz. Si te gusta, déjala. Si no, vuelve a elegir cambiar de voz.'
             : 'Este aparato solo tiene una voz en español.');
         } },
+        { texto: 'Apagar o encender los toques que acompañan a las fracciones.', alElegir: function () {
+          P.datos.sonidoBarras = P.datos.sonidoBarras === false;
+          P.guardar();
+          M.decir(P.datos.sonidoBarras ? 'Listo. Las fracciones vuelven a sonar con sus toques.' : 'Listo. Las fracciones ya no van a sonar con toques.');
+        } },
         { texto: 'Apagar o encender mi voz. Apágala solo si usas un lector de pantalla.', alElegir: function () {
           V.activar(!V.activa);
           M.decir(V.activa ? 'Mi voz está encendida otra vez.' : 'Voz del programa apagada. Ahora el lector de pantalla lee los textos.');
@@ -4357,7 +5232,7 @@ body.tactil.con-lector #gestos { display: none; }
     }
     var a = TECLAS[e.key];
     if (a) M.accion(a);
-    else if (/^[1-9]$/.test(e.key)) M.accion('numero', Number(e.key));
+    else if (/^[0-9]$/.test(e.key)) M.accion('numero', Number(e.key));
     else M.accion('otra', nombreTecla(e.key));
   });
 
@@ -4459,6 +5334,11 @@ body.tactil.con-lector #gestos { display: none; }
 </script>
 <script>
 if ('serviceWorker' in navigator) {
+  var yaEstabaGuardado = !!navigator.serviceWorker.controller;
+  // Cuando llega una versión nueva y todavía no se ha empezado, la página se recarga sola para mostrarla.
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (yaEstabaGuardado && !(window.AE && AE.Motor.iniciado)) window.location.reload();
+  });
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('sw.js').catch(function () { /* sin guardado: funciona igual con internet */ });
   });
